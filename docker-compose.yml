@@ -1,0 +1,30 @@
+services:
+  traefik:
+    image: traefik:v3
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+    networks:
+      - web
+
+  treetop:
+    build: ./server
+    ports:
+      - "3000:3000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./server:/app
+      - /app/node_modules
+    networks:
+      - web
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.treetop.rule=Host(`treetop.localhost`)"
+      - "traefik.http.services.treetop.loadbalancer.server.port=3000"
+
+networks:
+  web:
+    name: treetop_web
