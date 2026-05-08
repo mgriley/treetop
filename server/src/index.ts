@@ -2,6 +2,7 @@ import express from 'express';
 import { createServer as createHttpServer } from 'http';
 import path from 'path';
 import appsRouter from './routes/apps';
+import systemRouter from './routes/system';
 import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
@@ -13,6 +14,7 @@ async function start() {
 
   app.use(express.json());
   app.use('/api/apps', appsRouter);
+  app.use('/api/system', systemRouter);
   app.use(errorHandler);
 
   if (isDev) {

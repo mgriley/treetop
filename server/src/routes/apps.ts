@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import { docker } from '../docker';
+import { streamContainerLogs } from '../lib/streamLogs';
 
 const router = Router();
 
@@ -10,6 +11,15 @@ const NETWORK = 'treetop_web';
 const APP_PORT = 3000;
 
 const AppId = z.object({ id: z.string() });
+
+async function findContainer(id: string) {
+  const containers = await docker.listContainers({
+    all: true,
+    filters: JSON.stringify({ label: [`treetop.app.id=${id}`] }),
+  });
+  if (containers.length === 0) return null;
+  return docker.getContainer(containers[0].Id);
+}
 
 // List all installed apps by querying Docker for treetop-managed containers
 router.get('/', async (req: Request, res: Response) => {
@@ -29,9 +39,17 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // Get info for a single app
-router.get('/:id', (req: Request, res: Response) => {
+router.get('/:id', async (req: Request, res: Response) => {
   const { id } = AppId.parse(req.params);
-  res.json({ message: 'get-app stub', id });
+  const container = await findContainer(id);
+  if (!container) { res.status(404).json({ error: 'App not found' }); return; }
+  const info = await container.inspect();
+  res.json({
+    id,
+    installUrl: info.Config.Labels['treetop.app.installUrl'],
+    url: `http://${id}.localhost`,
+    status: info.State.Running ? 'running' : 'stopped',
+  });
 });
 
 // Install a new app from a URL
@@ -65,21 +83,38 @@ router.post('/install', async (req: Request, res: Response) => {
 });
 
 // Start an installed app
-router.post('/:id/start', (req: Request, res: Response) => {
+router.post('/:id/start', async (req: Request, res: Response) => {
   const { id } = AppId.parse(req.params);
-  res.json({ message: 'start-app stub', id });
+  const container = await findContainer(id);
+  if (!container) { res.status(404).json({ error: 'App not found' }); return; }
+  await container.start();
+  res.json({ id });
 });
 
 // Stop a running app
-router.post('/:id/stop', (req: Request, res: Response) => {
+router.post('/:id/stop', async (req: Request, res: Response) => {
   const { id } = AppId.parse(req.params);
-  res.json({ message: 'stop-app stub', id });
+  const container = await findContainer(id);
+  if (!container) { res.status(404).json({ error: 'App not found' }); return; }
+  await container.stop();
+  res.json({ id });
 });
 
-// Delete an app
-router.delete('/:id', (req: Request, res: Response) => {
+// Stream container logs as SSE
+router.get('/:id/logs', async (req: Request, res: Response) => {
   const { id } = AppId.parse(req.params);
-  res.json({ message: 'delete-app stub', id });
+  const container = await findContainer(id);
+  if (!container) { res.status(404).json({ error: 'App not found' }); return; }
+  await streamContainerLogs(container, req, res);
+});
+
+// Delete an app and its container
+router.delete('/:id', async (req: Request, res: Response) => {
+  const { id } = AppId.parse(req.params);
+  const container = await findContainer(id);
+  if (!container) { res.status(404).json({ error: 'App not found' }); return; }
+  await container.remove({ force: true });
+  res.json({ id });
 });
 
 export default router;

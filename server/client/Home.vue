@@ -1,6 +1,9 @@
 <template>
   <main>
-    <h1>Treetop</h1>
+    <div class="title-row">
+      <h1>Treetop</h1>
+      <RouterLink to="/admin" class="admin-link">Admin</RouterLink>
+    </div>
 
     <section class="install">
       <form @submit.prevent="install">
@@ -23,10 +26,31 @@
       <ul v-else>
         <li v-for="app in apps" :key="app.id">
           <div class="app-info">
-            <span class="app-url">{{ app.installUrl }}</span>
+            <RouterLink :to="`/apps/${app.id}`" class="app-name">{{ app.installUrl }}</RouterLink>
             <span :class="['status', app.status]">{{ app.status }}</span>
           </div>
-          <a :href="app.url" target="_blank">{{ app.url }}</a>
+          <div class="app-footer">
+            <a :href="app.url" target="_blank">{{ app.url }}</a>
+            <div class="actions">
+              <button
+                v-if="app.status === 'running'"
+                class="btn-stop"
+                :disabled="!!pending[app.id]"
+                @click="stop(app.id)"
+              >Stop</button>
+              <button
+                v-else
+                class="btn-start"
+                :disabled="!!pending[app.id]"
+                @click="start(app.id)"
+              >Start</button>
+              <button
+                class="btn-delete"
+                :disabled="!!pending[app.id]"
+                @click="remove(app.id)"
+              >Delete</button>
+            </div>
+          </div>
         </li>
       </ul>
     </section>
@@ -35,13 +59,14 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { listApps, installApp, type App } from './api';
+import { listApps, installApp, startApp, stopApp, deleteApp, type App } from './api';
 
 const apps = ref<App[]>([]);
 const loading = ref(true);
 const installUrl = ref('');
 const installing = ref(false);
 const installError = ref('');
+const pending = ref<Record<string, boolean>>({});
 
 async function fetchApps() {
   loading.value = true;
@@ -63,6 +88,20 @@ async function install() {
   }
 }
 
+async function withPending(id: string, fn: () => Promise<void>) {
+  pending.value[id] = true;
+  try {
+    await fn();
+    await fetchApps();
+  } finally {
+    delete pending.value[id];
+  }
+}
+
+const start  = (id: string) => withPending(id, () => startApp(id));
+const stop   = (id: string) => withPending(id, () => stopApp(id));
+const remove = (id: string) => withPending(id, () => deleteApp(id));
+
 onMounted(fetchApps);
 </script>
 
@@ -74,9 +113,26 @@ main {
   font-family: sans-serif;
 }
 
+.title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+
 h1 {
   font-size: 2rem;
-  margin-bottom: 32px;
+  margin: 0;
+}
+
+.admin-link {
+  font-size: 0.9rem;
+  color: #6b7280;
+  text-decoration: none;
+}
+
+.admin-link:hover {
+  text-decoration: underline;
 }
 
 .install form {
@@ -131,7 +187,7 @@ h1 {
   border-radius: 8px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
 }
 
 .app-info {
@@ -140,8 +196,14 @@ h1 {
   justify-content: space-between;
 }
 
-.app-url {
+.app-name {
   font-weight: 500;
+  text-decoration: none;
+  color: inherit;
+}
+
+.app-name:hover {
+  text-decoration: underline;
 }
 
 .status {
@@ -157,6 +219,12 @@ h1 {
   color: #16a34a;
 }
 
+.app-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .apps a {
   font-size: 0.9rem;
   color: #6b7280;
@@ -166,4 +234,26 @@ h1 {
 .apps a:hover {
   text-decoration: underline;
 }
+
+.actions {
+  display: flex;
+  gap: 6px;
+}
+
+.actions button {
+  padding: 4px 12px;
+  font-size: 0.85rem;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.actions button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.btn-start  { background: #dcfce7; color: #16a34a; }
+.btn-stop   { background: #fef9c3; color: #854d0e; }
+.btn-delete { background: #fee2e2; color: #dc2626; }
 </style>
