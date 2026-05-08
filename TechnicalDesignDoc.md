@@ -115,6 +115,27 @@ some way that the app deems fit. This is I think more flexible than having some 
 for the user to set user settings through the admin interface using an iframe, schema-based editor,
 or something.
 
+# Other Features
+
+## Live development
+
+Would be cool if had some helper utilites for live development (to start, just with typescript servers).
+- Setup with the AI integration. Would be cool. Could have different starter containers for different
+languages, too.
+- Pref could edit in-browser or edit locally and have it auto-sync to your server.
+- Ability to download + remix other people's stuff
+- Client app should also have auto-load as you develop
+
+## Backup, import, export, and copy
+
+Should probably have a decent story here. Especially for backup.
+- Since containerized, should be very easy, ideally.
+
+## Flexible download sources
+
+Typical source should just be JS by URL, but should also support torrent distribution of
+apps.
+
 # Anything else?
 
 Idk, that sounds like it might be it :)

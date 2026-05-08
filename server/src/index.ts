@@ -1,6 +1,8 @@
 import express from 'express';
 import { createServer as createHttpServer } from 'http';
 import path from 'path';
+import appsRouter from './routes/apps';
+import { errorHandler } from './middleware/errorHandler';
 
 const app = express();
 const PORT = process.env.PORT ?? 3000;
@@ -8,6 +10,10 @@ const isDev = process.env.NODE_ENV !== 'production';
 
 async function start() {
   const httpServer = createHttpServer(app);
+
+  app.use(express.json());
+  app.use('/api/apps', appsRouter);
+  app.use(errorHandler);
 
   if (isDev) {
     // Vite intercepts requests for client files and serves them on the fly —
