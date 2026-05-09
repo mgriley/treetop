@@ -1,5 +1,6 @@
 export interface App {
   id: string;
+  name: string;
   installUrl: string;
   url: string;
   status: string;
@@ -11,9 +12,28 @@ export async function getApp(id: string): Promise<App> {
   return res.json();
 }
 
+export async function getAppByName(name: string): Promise<App> {
+  const res = await fetch(`/api/apps/by-name/${name}`);
+  if (!res.ok) throw new Error('App not found');
+  return res.json();
+}
+
 export async function listApps(): Promise<App[]> {
   const res = await fetch('/api/apps');
   if (!res.ok) throw new Error('Failed to fetch apps');
+  return res.json();
+}
+
+export async function renameApp(id: string, name: string): Promise<App> {
+  const res = await fetch(`/api/apps/${id}/name`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? 'Failed to rename app');
+  }
   return res.json();
 }
 
@@ -32,11 +52,11 @@ export async function deleteApp(id: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to delete app');
 }
 
-export async function installApp(url: string): Promise<App> {
+export async function installApp(url: string, name: string): Promise<App> {
   const res = await fetch('/api/apps/install', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url }),
+    body: JSON.stringify({ url, name }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

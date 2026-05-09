@@ -7,6 +7,8 @@ export async function streamContainerLogs(container: Container, req: Request, re
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
 
   const send = (line: string, type: 'stdout' | 'stderr') =>
     res.write(`data: ${JSON.stringify({ line, type })}\n\n`);

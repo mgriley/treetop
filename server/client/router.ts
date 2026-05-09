@@ -7,7 +7,7 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', component: Home },
-    { path: '/apps/:id', component: AppDetails },
+    { path: '/apps/:name', component: AppDetails },
     { path: '/admin', component: AdminPage },
   ],
 });

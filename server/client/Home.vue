@@ -6,7 +6,7 @@
     </div>
 
     <section class="install">
-      <form @submit.prevent="install">
+      <form @submit.prevent="openModal">
         <input
           v-model="installUrl"
           type="url"
@@ -20,13 +20,20 @@
       <p v-if="installError" class="error">{{ installError }}</p>
     </section>
 
+    <InstallModal
+      v-if="showModal"
+      :url="installUrl"
+      @confirm="install"
+      @cancel="showModal = false"
+    />
+
     <section class="apps">
       <p v-if="loading">Loading apps...</p>
       <p v-else-if="apps.length === 0">No apps installed yet.</p>
       <ul v-else>
         <li v-for="app in apps" :key="app.id">
           <div class="app-info">
-            <RouterLink :to="`/apps/${app.id}`" class="app-name">{{ app.installUrl }}</RouterLink>
+            <RouterLink :to="`/apps/${app.name}`" class="app-name">{{ app.name }}</RouterLink>
             <span :class="['status', app.status]">{{ app.status }}</span>
           </div>
           <div class="app-footer">
@@ -60,6 +67,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { listApps, installApp, startApp, stopApp, deleteApp, type App } from './api';
+import InstallModal from './InstallModal.vue';
 
 const apps = ref<App[]>([]);
 const loading = ref(true);
@@ -67,6 +75,11 @@ const installUrl = ref('');
 const installing = ref(false);
 const installError = ref('');
 const pending = ref<Record<string, boolean>>({});
+const showModal = ref(false);
+
+function openModal() {
+  showModal.value = true;
+}
 
 async function fetchApps() {
   loading.value = true;
@@ -74,11 +87,12 @@ async function fetchApps() {
   loading.value = false;
 }
 
-async function install() {
+async function install(name: string) {
+  showModal.value = false;
   installError.value = '';
   installing.value = true;
   try {
-    await installApp(installUrl.value);
+    await installApp(installUrl.value, name);
     installUrl.value = '';
     await fetchApps();
   } catch (err) {
