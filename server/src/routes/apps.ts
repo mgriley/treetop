@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { randomUUID } from 'crypto';
+import { mkdirSync } from 'fs';
 import { z } from 'zod';
 import { docker } from '../docker';
 import { streamContainerLogs } from '../lib/streamLogs';
@@ -9,6 +10,10 @@ const router = Router();
 const MANAGER_IMAGE = 'treetop-app-manager';
 const NETWORK = 'treetop_web';
 const APP_PORT = 3000;
+const DATA_ROOT = '/treetop-data/apps';           // path inside the treetop container
+const HOST_DATA_ROOT = process.env.HOST_DATA_ROOT  // path on the Docker host
+  ? `${process.env.HOST_DATA_ROOT}/apps`
+  : DATA_ROOT;
 
 const AppId = z.object({ id: z.string() });
 const AppName = z.string().min(1).max(63).regex(/^[a-z0-9][a-z0-9-]*$/, 'Name must be lowercase alphanumeric with hyphens');
@@ -84,12 +89,17 @@ router.post('/install', async (req: Request, res: Response) => {
 
   const id = randomUUID();
   const hostname = `${name}.localhost`;
+  const workspaceDir = `${DATA_ROOT}/${id}`;       // used for fs operations inside this container
+  const hostWorkspaceDir = `${HOST_DATA_ROOT}/${id}`; // used for the bind mount path Docker resolves on the host
+
+  mkdirSync(workspaceDir, { recursive: true });
 
   const container = await docker.createContainer({
     name: `treetop-app-${name}`,
     Image: MANAGER_IMAGE,
     Env: [`APP_URL=${url}`],
     HostConfig: {
+      Binds: [`${hostWorkspaceDir}:/workspace`],
       NetworkMode: NETWORK,
       RestartPolicy: { Name: 'unless-stopped' },
     },

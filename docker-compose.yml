@@ -14,8 +14,10 @@ services:
     build: ./server
     environment:
       - NODE_ENV=production
+      - HOST_DATA_ROOT=/treetop-data
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - /treetop-data:/treetop-data
     networks:
       - web
     restart: unless-stopped

@@ -7,7 +7,10 @@ services:
     command: sh -c "npm install && npm run dev"
     environment:
       - NODE_ENV=development
+      - VITE_CJS_IGNORE_WARNING=true
+      - HOST_DATA_ROOT=${PWD}/data
     ports:
       - "3000:3000"
     volumes:
       - ./server:/app
+      - ./data:/treetop-data

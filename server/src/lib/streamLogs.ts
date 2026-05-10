@@ -1,4 +1,4 @@
-import { Writable } from 'stream';
+import { Writable, Readable } from 'stream';
 import { Request, Response } from 'express';
 import { Container } from 'dockerode';
 import { docker } from '../docker';
@@ -29,7 +29,7 @@ export async function streamContainerLogs(container: Container, req: Request, re
 
   const logStream = await container.logs({
     follow: true, stdout: true, stderr: true, tail: 200,
-  });
+  }) as Readable;
 
   (docker as any).modem.demuxStream(logStream, stdout, stderr);
   req.on('close', () => logStream.destroy());

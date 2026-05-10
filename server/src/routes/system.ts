@@ -14,7 +14,7 @@ async function findServiceContainer(service: string) {
 }
 
 router.get('/logs/:service', async (req: Request, res: Response) => {
-  const { service } = req.params;
+  const service = String(req.params.service);
   const container = await findServiceContainer(service);
   if (!container) { res.status(404).json({ error: `Container '${service}' not found` }); return; }
   await streamContainerLogs(container, req, res);
