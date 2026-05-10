@@ -27,6 +27,14 @@ async function findContainer(id: string) {
   return docker.getContainer(containers[0].Id);
 }
 
+async function isNameTaken(name: string, excludeId?: string): Promise<boolean> {
+  const containers = await docker.listContainers({
+    all: true,
+    filters: JSON.stringify({ label: [`treetop.app.name=${name}`] }),
+  });
+  return containers.some(c => c.Labels['treetop.app.id'] !== excludeId);
+}
+
 // List all installed apps by querying Docker for treetop-managed containers
 router.get('/', async (req: Request, res: Response) => {
   const containers = await docker.listContainers({
@@ -87,6 +95,11 @@ router.post('/install', async (req: Request, res: Response) => {
     name: AppName,
   }).parse(req.body);
 
+  if (await isNameTaken(name)) {
+    res.status(409).json({ error: `An app named '${name}' already exists` });
+    return;
+  }
+
   const id = randomUUID();
   const hostname = `${name}.localhost`;
   const workspaceDir = `${DATA_ROOT}/${id}`;       // used for fs operations inside this container
@@ -126,6 +139,11 @@ router.patch('/:id/name', async (req: Request, res: Response) => {
 
   const container = await findContainer(id);
   if (!container) { res.status(404).json({ error: 'App not found' }); return; }
+
+  if (await isNameTaken(name, id)) {
+    res.status(409).json({ error: `An app named '${name}' already exists` });
+    return;
+  }
 
   const info = await container.inspect();
   const hostname = `${name}.localhost`;
