@@ -181,6 +181,15 @@ router.post('/:id/start', async (req: Request, res: Response) => {
   res.json({ id });
 });
 
+// Restart an app
+router.post('/:id/restart', async (req: Request, res: Response) => {
+  const { id } = AppId.parse(req.params);
+  const container = await findContainer(id);
+  if (!container) { res.status(404).json({ error: 'App not found' }); return; }
+  await container.restart();
+  res.json({ id });
+});
+
 // Stop a running app
 router.post('/:id/stop', async (req: Request, res: Response) => {
   const { id } = AppId.parse(req.params);

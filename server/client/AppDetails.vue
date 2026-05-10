@@ -16,6 +16,7 @@
       <div class="actions">
         <button v-if="app.status === 'running'" class="btn-stop" :disabled="!!pending" @click="stop">Stop</button>
         <button v-else class="btn-start" :disabled="!!pending" @click="start">Start</button>
+        <button class="btn-restart" :disabled="!!pending" @click="restart">Restart</button>
         <button class="btn-delete" :disabled="!!pending" @click="remove">Delete</button>
       </div>
 
@@ -48,7 +49,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { getAppByName, startApp, stopApp, deleteApp, renameApp, type App } from './api';
+import { getAppByName, startApp, stopApp, restartApp, deleteApp, renameApp, type App } from './api';
 import LogPanel from './LogPanel.vue';
 
 const route = useRoute();
@@ -92,8 +93,9 @@ async function withPending(fn: () => Promise<void>) {
   }
 }
 
-async function start()  { await withPending(() => startApp(app.value!.id)); }
-async function stop()   { await withPending(() => stopApp(app.value!.id)); }
+async function start()   { await withPending(() => startApp(app.value!.id)); }
+async function stop()    { await withPending(() => stopApp(app.value!.id)); }
+async function restart() { await withPending(() => restartApp(app.value!.id)); }
 async function remove() {
   await withPending(() => deleteApp(app.value!.id));
   router.push('/');
@@ -171,9 +173,10 @@ h1 { font-size: 1.5rem; margin: 0 0 4px; }
 
 .actions button:disabled { opacity: 0.4; cursor: default; }
 
-.btn-start  { background: #dcfce7; color: #16a34a; }
-.btn-stop   { background: #fef9c3; color: #854d0e; }
-.btn-delete { background: #fee2e2; color: #dc2626; }
+.btn-start   { background: #dcfce7; color: #16a34a; }
+.btn-stop    { background: #fef9c3; color: #854d0e; }
+.btn-restart { background: #eff6ff; color: #2563eb; }
+.btn-delete  { background: #fee2e2; color: #dc2626; }
 
 .admin {
   margin-top: 48px;
