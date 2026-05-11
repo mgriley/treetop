@@ -1,6 +1,7 @@
 import { PassThrough, Readable } from 'stream';
 import type { Container } from 'dockerode';
 import { docker } from '../docker';
+import { managerApi } from '../lib/managerApi';
 import type { AgentInterface, AgentMessage, AgentReplyChunk, AgentToolCall, AgentTool } from './AgentInterface';
 
 const TOOLS: AgentTool[] = [
@@ -18,7 +19,23 @@ const TOOLS: AgentTool[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'softRestart',
+      description: 'Restart the app process inside the container. Call this after modifying any app files so the changes take effect.',
+      parameters: {
+        type: 'object',
+        properties: {},
+        required: [],
+      },
+    },
+  },
 ];
+
+const SYSTEM_PROMPT = `You are an AI assistant that can inspect and modify a running web application inside a Docker container. \
+The app source code is in the current working directory. \
+After making any changes to the application files, always call softRestart so the changes take effect.`;
 
 export class ContainerAgent {
   constructor(
@@ -31,11 +48,16 @@ export class ContainerAgent {
   }
 
   async *streamReply(messages: AgentMessage[], model: string): AsyncIterable<AgentReplyChunk> {
+    const messagesWithSystem: AgentMessage[] = [
+      { role: 'system', content: SYSTEM_PROMPT },
+      ...messages,
+    ];
+
     while (true) {
       const toolCalls: AgentToolCall[] = [];
       const textParts: string[] = [];
 
-      for await (const chunk of this.agent.streamReply(messages, this.tools, model)) {
+      for await (const chunk of this.agent.streamReply(messagesWithSystem, this.tools, model)) {
         yield chunk;
         if (chunk.type === 'text-delta') textParts.push(chunk.delta);
         if (chunk.type === 'tool_call') toolCalls.push(chunk.tool_call);
@@ -43,22 +65,18 @@ export class ContainerAgent {
 
       if (toolCalls.length === 0) break;
 
-      messages = [
-        ...messages,
-        {
-          role: 'assistant',
-          content: textParts.length > 0 ? textParts.join('') : null,
-          tool_calls: toolCalls,
-        },
-      ];
+      messagesWithSystem.push({
+        role: 'assistant',
+        content: textParts.length > 0 ? textParts.join('') : null,
+        tool_calls: toolCalls,
+      });
 
       for (const tc of toolCalls) {
         const result = await this.dispatch(tc);
         yield { type: 'tool_result', tool_call_id: tc.id, result };
-        messages = [
-          ...messages,
+        messagesWithSystem.push(
           { role: 'tool', content: result, tool_call_id: tc.id, tool_name: tc.function.name },
-        ];
+        );
       }
     }
   }
@@ -68,7 +86,15 @@ export class ContainerAgent {
       const { command } = tc.function.arguments as { command: string };
       return this.execCommand(command);
     }
+    if (tc.function.name === 'softRestart') {
+      return this.softRestart();
+    }
     return `Unknown tool: ${tc.function.name}`;
+  }
+
+  async softRestart(): Promise<string> {
+    await managerApi.restart(this.container);
+    return 'App restarted successfully.';
   }
 
   async execCommand(command: string): Promise<string> {
