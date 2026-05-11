@@ -57,13 +57,12 @@ export async function deleteApp(id: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to delete app');
 }
 
-export async function listExpectedSecrets(): Promise<string[]> {
-  const res = await fetch('/api/secrets/expected');
-  if (!res.ok) throw new Error('Failed to fetch expected secrets');
-  return res.json();
+export interface SecretStatus {
+  key: string;
+  isSet: boolean;
 }
 
-export async function listSecrets(): Promise<string[]> {
+export async function listSecrets(): Promise<SecretStatus[]> {
   const res = await fetch('/api/secrets');
   if (!res.ok) throw new Error('Failed to fetch secrets');
   return res.json();
@@ -81,9 +80,9 @@ export async function setSecret(key: string, value: string): Promise<void> {
   }
 }
 
-export async function deleteSecret(key: string): Promise<void> {
+export async function clearSecret(key: string): Promise<void> {
   const res = await fetch(`/api/secrets/${key}`, { method: 'DELETE' });
-  if (!res.ok) throw new Error('Failed to delete secret');
+  if (!res.ok) throw new Error('Failed to clear secret');
 }
 
 export async function installApp(url: string, name: string): Promise<App> {

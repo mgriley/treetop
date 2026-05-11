@@ -1,30 +1,19 @@
 <template>
   <div class="secret-manager">
-    <div v-if="keys.length > 0" class="key-list">
-      <div v-for="key in keys" :key="key" class="key-row">
-        <span class="key-name">{{ key }}</span>
-        <button class="btn-update" @click="startUpdate(key)">Update</button>
-        <button class="btn-delete" @click="remove(key)">Delete</button>
+    <div class="key-list">
+      <div v-for="s in secrets" :key="s.key" class="key-row">
+        <span class="key-name">{{ s.key }}</span>
+        <span :class="['badge', s.isSet ? 'set' : 'unset']">{{ s.isSet ? 'set' : 'not set' }}</span>
+        <button class="btn-action" @click="startEdit(s.key)">{{ s.isSet ? 'Update' : 'Set' }}</button>
+        <button v-if="s.isSet" class="btn-clear" @click="clear(s.key)">Clear</button>
       </div>
     </div>
-    <p v-else class="empty">No secrets stored yet.</p>
 
-    <form class="add-form" @submit.prevent="submit">
-      <input
-        v-model="formKey"
-        type="text"
-        placeholder="KEY_NAME"
-        spellcheck="false"
-        class="input-key"
-      />
-      <input
-        v-model="formValue"
-        type="password"
-        placeholder="value"
-        class="input-value"
-      />
-      <button type="submit" :disabled="!canSubmit">{{ editing ? 'Update' : 'Add' }}</button>
-      <button v-if="editing" type="button" class="btn-cancel" @click="cancelEdit">Cancel</button>
+    <form v-if="editingKey" class="edit-form" @submit.prevent="submit">
+      <span class="edit-key">{{ editingKey }}</span>
+      <input v-model="formValue" type="password" placeholder="value" ref="valueInput" />
+      <button type="submit" :disabled="!formValue">Save</button>
+      <button type="button" class="btn-cancel" @click="cancelEdit">Cancel</button>
     </form>
 
     <p v-if="error" class="error">{{ error }}</p>
@@ -32,45 +21,38 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { listSecrets, setSecret, deleteSecret } from './api';
+import { ref, onMounted, nextTick } from 'vue';
+import { listSecrets, setSecret, clearSecret, type SecretStatus } from './api';
 
-const keys = ref<string[]>([]);
-const formKey = ref('');
+const secrets = ref<SecretStatus[]>([]);
+const editingKey = ref<string | null>(null);
 const formValue = ref('');
-const editing = ref(false);
+const valueInput = ref<HTMLInputElement | null>(null);
 const error = ref('');
 
-const KEY_RE = /^[A-Z0-9_]+$/;
-const canSubmit = computed(() =>
-  formKey.value.length > 0 &&
-  formValue.value.length > 0 &&
-  KEY_RE.test(formKey.value)
-);
-
 async function load() {
-  keys.value = await listSecrets();
+  secrets.value = await listSecrets();
 }
 
-function startUpdate(key: string) {
-  formKey.value = key;
+async function startEdit(key: string) {
+  editingKey.value = key;
   formValue.value = '';
-  editing.value = true;
   error.value = '';
+  await nextTick();
+  valueInput.value?.focus();
 }
 
 function cancelEdit() {
-  formKey.value = '';
+  editingKey.value = null;
   formValue.value = '';
-  editing.value = false;
   error.value = '';
 }
 
 async function submit() {
-  if (!canSubmit.value) return;
+  if (!formValue.value || !editingKey.value) return;
   error.value = '';
   try {
-    await setSecret(formKey.value, formValue.value);
+    await setSecret(editingKey.value, formValue.value);
     cancelEdit();
     await load();
   } catch (err) {
@@ -78,13 +60,13 @@ async function submit() {
   }
 }
 
-async function remove(key: string) {
+async function clear(key: string) {
   error.value = '';
   try {
-    await deleteSecret(key);
+    await clearSecret(key);
     await load();
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Failed to delete secret';
+    error.value = err instanceof Error ? err.message : 'Failed to clear secret';
   }
 }
 
@@ -92,95 +74,97 @@ onMounted(load);
 </script>
 
 <style scoped>
-.secret-manager { display: flex; flex-direction: column; gap: 16px; }
+.secret-manager { display: flex; flex-direction: column; gap: 8px; }
 
-.key-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+.key-list { display: flex; flex-direction: column; gap: 4px; }
 
 .key-row {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: #f9fafb;
   border: 1px solid #e5e7eb;
   border-radius: 6px;
+  background: #f9fafb;
 }
 
-.key-name {
-  flex: 1;
-  font-family: monospace;
-  font-size: 0.9rem;
-  color: #111827;
+.key-name { flex: 1; font-family: monospace; font-size: 0.9rem; color: #111827; }
+
+.badge {
+  font-size: 0.75rem;
+  padding: 2px 7px;
+  border-radius: 99px;
 }
 
-.empty { font-size: 0.85rem; color: #9ca3af; margin: 0; }
+.badge.set   { background: #dcfce7; color: #16a34a; }
+.badge.unset { background: #fef9c3; color: #854d0e; }
 
-.add-form {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.input-key {
-  width: 180px;
-  padding: 8px 12px;
-  font-size: 0.9rem;
-  font-family: monospace;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  outline: none;
-}
-
-.input-value {
-  flex: 1;
-  min-width: 140px;
-  padding: 8px 12px;
-  font-size: 0.9rem;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  outline: none;
-}
-
-.input-key:focus,
-.input-value:focus {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
-}
-
-.add-form button {
-  padding: 8px 16px;
-  font-size: 0.9rem;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.add-form button[type="submit"] { background: #3b82f6; color: white; }
-.add-form button[type="submit"]:disabled { opacity: 0.4; cursor: default; }
-
-.btn-cancel { background: #f3f4f6; color: #374151; }
-
-.btn-update {
+.btn-action {
   padding: 4px 10px;
   font-size: 0.8rem;
   border: 1px solid #d1d5db;
   border-radius: 4px;
   background: white;
-  cursor: pointer;
   color: #374151;
+  cursor: pointer;
 }
 
-.btn-delete {
+.btn-clear {
   padding: 4px 10px;
   font-size: 0.8rem;
   border: none;
   border-radius: 4px;
   background: #fee2e2;
   color: #dc2626;
+  cursor: pointer;
+}
+
+.edit-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  background: #eff6ff;
+}
+
+.edit-key { font-family: monospace; font-size: 0.9rem; color: #1d4ed8; white-space: nowrap; }
+
+.edit-form input {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  outline: none;
+  background: white;
+}
+
+.edit-form input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+}
+
+.edit-form button[type="submit"] {
+  padding: 6px 14px;
+  font-size: 0.9rem;
+  border: none;
+  border-radius: 6px;
+  background: #3b82f6;
+  color: white;
+  cursor: pointer;
+}
+
+.edit-form button[type="submit"]:disabled { opacity: 0.4; cursor: default; }
+
+.btn-cancel {
+  padding: 6px 12px;
+  font-size: 0.9rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  color: #374151;
   cursor: pointer;
 }
 
