@@ -24,6 +24,11 @@
         <h2>Admin</h2>
 
         <div class="admin-block">
+          <h3>Agent</h3>
+          <AgentChat :app-id="app.id" />
+        </div>
+
+        <div class="admin-block">
           <h3>Logs</h3>
           <LogPanel :log-url="`/api/apps/${app.id}/logs`" />
         </div>
@@ -51,6 +56,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { getAppByName, startApp, stopApp, restartApp, deleteApp, renameApp, type App } from './api';
 import LogPanel from './LogPanel.vue';
+import AgentChat from './AgentChat.vue';
 
 const route = useRoute();
 const router = useRouter();

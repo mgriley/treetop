@@ -207,6 +207,17 @@ router.get('/:id/logs', async (req: Request, res: Response) => {
   await streamContainerLogs(container, req, res);
 });
 
+// Send a prompt to the AI agent for a given app (no-op stub)
+router.post('/:id/agent', async (req: Request, res: Response) => {
+  const { id } = AppId.parse(req.params);
+  const { prompt } = z.object({ prompt: z.string().min(1) }).parse(req.body);
+
+  const container = await findContainer(id);
+  if (!container) { res.status(404).json({ error: 'App not found' }); return; }
+
+  res.json({ id, prompt, result: null });
+});
+
 // Delete an app and its container
 router.delete('/:id', async (req: Request, res: Response) => {
   const { id } = AppId.parse(req.params);

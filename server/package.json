@@ -8,6 +8,7 @@
     "build": "vite build && tsc"
   },
   "dependencies": {
+    "ai": "^6.0.177",
     "dockerode": "^5.0.0",
     "express": "^5.2.1",
     "vue": "^3.4.0",
