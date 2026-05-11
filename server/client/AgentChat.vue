@@ -78,6 +78,7 @@ watch(() => props.appId, (id) => {
 .message { display: flex; }
 .message.user  { justify-content: flex-end; }
 .message.agent { justify-content: flex-start; }
+.message.tool  { justify-content: flex-start; }
 
 .bubble {
   max-width: 80%;
@@ -91,6 +92,7 @@ watch(() => props.appId, (id) => {
 
 .user  .bubble { background: #3b82f6; color: white; border-bottom-right-radius: 4px; }
 .agent .bubble { background: #f3f4f6; color: #111827; border-bottom-left-radius: 4px; }
+.tool  .bubble { background: #1e1e1e; color: #d4d4d4; font-family: monospace; font-size: 0.82rem; border-radius: 6px; width: 100%; }
 
 .chat-error { font-size: 0.8rem; color: #ef4444; margin: 0; }
 

@@ -42,6 +42,11 @@ export async function restartApp(id: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to restart app');
 }
 
+export async function softRestartApp(id: string): Promise<void> {
+  const res = await fetch(`/api/apps/${id}/soft-restart`, { method: 'POST' });
+  if (!res.ok) throw new Error('Failed to soft-restart app');
+}
+
 export async function startApp(id: string): Promise<void> {
   const res = await fetch(`/api/apps/${id}/start`, { method: 'POST' });
   if (!res.ok) throw new Error('Failed to start app');

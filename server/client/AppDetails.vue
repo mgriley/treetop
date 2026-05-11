@@ -17,6 +17,7 @@
         <button v-if="app.status === 'running'" class="btn-stop" :disabled="!!pending" @click="stop">Stop</button>
         <button v-else class="btn-start" :disabled="!!pending" @click="start">Start</button>
         <button class="btn-restart" :disabled="!!pending" @click="restart">Restart</button>
+        <button class="btn-soft-restart" :disabled="!!pending" @click="softRestart">Soft restart</button>
         <button class="btn-delete" :disabled="!!pending" @click="remove">Delete</button>
       </div>
 
@@ -54,7 +55,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { getAppByName, startApp, stopApp, restartApp, deleteApp, renameApp, type App } from './api';
+import { getAppByName, startApp, stopApp, restartApp, softRestartApp, deleteApp, renameApp, type App } from './api';
 import LogPanel from './LogPanel.vue';
 import AgentChat from './AgentChat.vue';
 
@@ -101,7 +102,8 @@ async function withPending(fn: () => Promise<void>) {
 
 async function start()   { await withPending(() => startApp(app.value!.id)); }
 async function stop()    { await withPending(() => stopApp(app.value!.id)); }
-async function restart() { await withPending(() => restartApp(app.value!.id)); }
+async function restart()      { await withPending(() => restartApp(app.value!.id)); }
+async function softRestart() { await withPending(() => softRestartApp(app.value!.id)); }
 async function remove() {
   await withPending(() => deleteApp(app.value!.id));
   router.push('/');
@@ -181,7 +183,8 @@ h1 { font-size: 1.5rem; margin: 0 0 4px; }
 
 .btn-start   { background: #dcfce7; color: #16a34a; }
 .btn-stop    { background: #fef9c3; color: #854d0e; }
-.btn-restart { background: #eff6ff; color: #2563eb; }
+.btn-restart      { background: #eff6ff; color: #2563eb; }
+.btn-soft-restart { background: #f5f3ff; color: #7c3aed; }
 .btn-delete  { background: #fee2e2; color: #dc2626; }
 
 .admin {

@@ -76,6 +76,7 @@ export class ContainerAgent {
       Cmd: ['sh', '-c', command],
       AttachStdout: true,
       AttachStderr: true,
+      WorkingDir: '/workspace/code',
     });
 
     const stream = await exec.start({}) as unknown as Readable;

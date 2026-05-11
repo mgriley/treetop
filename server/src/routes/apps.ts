@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { Container } from 'dockerode';
 import { randomUUID } from 'crypto';
 import { mkdirSync } from 'fs';
 import { z } from 'zod';
@@ -14,6 +15,7 @@ const router = Router();
 const MANAGER_IMAGE = 'treetop-app-manager';
 const NETWORK = 'treetop_web';
 const APP_PORT = 3000;
+const MANAGER_MGMT_PORT = 4000;
 const DATA_ROOT = '/treetop-data/apps';           // path inside the treetop container
 const HOST_DATA_ROOT = process.env.HOST_DATA_ROOT  // path on the Docker host
   ? `${process.env.HOST_DATA_ROOT}/apps`
@@ -21,6 +23,13 @@ const HOST_DATA_ROOT = process.env.HOST_DATA_ROOT  // path on the Docker host
 
 const AppId = z.object({ id: z.string() });
 const AppName = z.string().min(1).max(63).regex(/^[a-z0-9][a-z0-9-]*$/, 'Name must be lowercase alphanumeric with hyphens');
+
+async function callManagerApi(container: Container, path: string): Promise<void> {
+  const info = await container.inspect();
+  const name = info.Name.replace(/^\//, '');
+  const res = await fetch(`http://${name}:${MANAGER_MGMT_PORT}${path}`, { method: 'POST' });
+  if (!res.ok) throw new Error(`Manager API error: ${res.status}`);
+}
 
 async function findContainer(id: string) {
   const containers = await docker.listContainers({
@@ -185,12 +194,21 @@ router.post('/:id/start', async (req: Request, res: Response) => {
   res.json({ id });
 });
 
-// Restart an app
+// Restart an app container
 router.post('/:id/restart', async (req: Request, res: Response) => {
   const { id } = AppId.parse(req.params);
   const container = await findContainer(id);
   if (!container) { res.status(404).json({ error: 'App not found' }); return; }
   await container.restart();
+  res.json({ id });
+});
+
+// Soft-restart — restarts only the app process inside the container via the manager API
+router.post('/:id/soft-restart', async (req: Request, res: Response) => {
+  const { id } = AppId.parse(req.params);
+  const container = await findContainer(id);
+  if (!container) { res.status(404).json({ error: 'App not found' }); return; }
+  await callManagerApi(container, '/restart');
   res.json({ id });
 });
 

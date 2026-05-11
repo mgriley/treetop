@@ -1,6 +1,9 @@
 const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const http = require('http');
+
+const MGMT_PORT = 4000;
 
 const APP_URL = process.env.APP_URL;
 if (!APP_URL) {
@@ -11,6 +14,7 @@ if (!APP_URL) {
 const CODE_DIR = path.join('/workspace', 'code');
 
 let subprocess = null;
+let exitHandler = null;
 
 function run(cmd, args, options = {}) {
   return new Promise((resolve, reject) => {
@@ -24,18 +28,48 @@ function run(cmd, args, options = {}) {
 }
 
 function startApp() {
-  if (subprocess) subprocess.kill();
+  if (subprocess) {
+    subprocess.removeListener('exit', exitHandler);
+    subprocess.kill();
+  }
 
   console.log('[manager] Starting app');
   subprocess = spawn('npm', ['start'], { cwd: CODE_DIR, stdio: 'inherit' });
 
-  subprocess.on('exit', (code) => {
+  exitHandler = (code) => {
     console.log(`[manager] App exited (code ${code}), restarting in 1s`);
     setTimeout(startApp, 1000);
+  };
+
+  subprocess.on('exit', exitHandler);
+}
+
+function startMgmtServer() {
+  console.log(`[manager] Starting management API on port ${MGMT_PORT}`);
+  const server = http.createServer((req, res) => {
+    if (req.method === 'POST' && req.url === '/restart') {
+      console.log('[manager] Restart requested via management API');
+      startApp();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+    } else {
+      res.writeHead(404);
+      res.end();
+    }
+  });
+
+  server.on('error', (err) => {
+    console.error(`[manager] Management API failed to start: ${err.message}`);
+  });
+
+  server.listen(MGMT_PORT, '0.0.0.0', () => {
+    console.log(`[manager] Management API listening on port ${MGMT_PORT}`);
   });
 }
 
 async function main() {
+  startMgmtServer();
+
   if (fs.existsSync(CODE_DIR)) {
     console.log('[manager] Workspace exists, skipping clone');
   } else {
