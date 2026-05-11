@@ -117,11 +117,23 @@ router.post('/install', async (req: Request, res: Response) => {
   const container = await docker.createContainer({
     name: `treetop-app-${name}`,
     Image: MANAGER_IMAGE,
-    Env: [`APP_URL=${url}`],
+    Env: [`APP_URL=${url}`, `NPM_CONFIG_CACHE=/workspace/.npm-cache`],
     HostConfig: {
       Binds: [`${hostWorkspaceDir}:/workspace`],
       NetworkMode: NETWORK,
       RestartPolicy: { Name: 'unless-stopped' },
+      // Security hardening — containers may run untrusted code
+      CapDrop: ['ALL'],                              // strip all Linux capabilities
+      SecurityOpt: ['no-new-privileges:true'],       // block execve-based privilege escalation
+      ReadonlyRootfs: true,                          // root FS is immutable; only workspace + tmpfs are writable
+      Tmpfs: {
+        '/tmp': 'rw,noexec,nosuid,size=64m',         // scratch space, no exec bit
+        '/root': 'rw,nosuid,size=32m',               // npm needs a home dir during install
+      },
+      Memory: 512 * 1024 * 1024,                    // 512 MB RAM cap
+      MemorySwap: 512 * 1024 * 1024,                // swap = Memory → no swap allowed
+      NanoCpus: 1_000_000_000,                      // 1 CPU
+      PidsLimit: 200,                               // cap process count to limit fork bombs
     },
     Labels: {
       'treetop.managed': 'true',
@@ -168,6 +180,7 @@ router.patch('/:id/name', async (req: Request, res: Response) => {
     Image: info.Config.Image,
     Env: info.Config.Env ?? [],
     HostConfig: {
+      ...info.HostConfig,
       NetworkMode: NETWORK,
       RestartPolicy: info.HostConfig.RestartPolicy,
     },

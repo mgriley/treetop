@@ -4,16 +4,31 @@ import path from 'path';
 import appsRouter from './routes/apps';
 import systemRouter from './routes/system';
 import secretsRouter from './routes/secrets';
+import authRouter from './routes/auth';
 import { errorHandler } from './middleware/errorHandler';
+import { authMiddleware } from './middleware/authMiddleware';
+import { AdminAuth } from './lib/AdminAuth';
 
 const app = express();
 const PORT = process.env.PORT ?? 3000;
 const isDev = process.env.NODE_ENV !== 'production';
 
 async function start() {
+  try {
+    AdminAuth.init();
+  } catch (err) {
+    console.error(`[startup] ${err instanceof Error ? err.message : err}`);
+    process.exit(1);
+  }
+
   const httpServer = createHttpServer(app);
 
+  app.set('trust proxy', 1); // trust X-Forwarded-For from Traefik
   app.use(express.json());
+
+  // Auth routes are unprotected — everything else under /api requires a valid token
+  app.use('/api/auth', authRouter);
+  app.use('/api', authMiddleware);
   app.use('/api/apps', appsRouter);
   app.use('/api/system', systemRouter);
   app.use('/api/secrets', secretsRouter);

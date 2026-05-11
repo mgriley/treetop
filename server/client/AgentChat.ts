@@ -1,3 +1,5 @@
+import { apiFetch } from './api';
+
 export interface ChatMessage {
   role: 'user' | 'agent' | 'tool';
   text: string;
@@ -26,7 +28,7 @@ export class AgentChat {
     };
 
     try {
-      const res = await fetch(`/api/apps/${this.appId}/agent`, {
+      const res = await apiFetch(`/api/apps/${this.appId}/agent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt }),
