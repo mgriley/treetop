@@ -24,11 +24,47 @@ export interface AgentTool {
   };
 }
 
+export type AgentReplyChunk =
+  | { type: 'text-delta'; delta: string }
+  | { type: 'tool_call'; tool_call: AgentToolCall }
+  | { type: 'tool_result'; tool_call_id: string; result: string };
+
+export interface ModelInfo {
+  name: string;
+}
+
 export interface AgentReply {
   content: string | null;
   tool_calls?: AgentToolCall[];
 }
 
-export interface AgentInterface {
-  getReply(messages: AgentMessage[], tools: AgentTool[], model: string): Promise<AgentReply>;
+export abstract class AgentInterface {
+  abstract streamReply(
+    messages: AgentMessage[],
+    tools: AgentTool[],
+    model: string,
+  ): AsyncIterable<AgentReplyChunk>;
+
+  /**
+   * For convenience, also provide a method that collects the streamed chunks into a single reply object. 
+   */
+  async getReply(messages: AgentMessage[], tools: AgentTool[], model: string): Promise<AgentReply> {
+    const textParts: string[] = [];
+    const tool_calls: AgentToolCall[] = [];
+
+    for await (const chunk of this.streamReply(messages, tools, model)) {
+      if (chunk.type === 'text-delta') {
+        textParts.push(chunk.delta);
+      } else if (chunk.type === 'tool_call') {
+        tool_calls.push(chunk.tool_call);
+      }
+    }
+
+    return {
+      content: textParts.length > 0 ? textParts.join('') : null,
+      tool_calls: tool_calls.length > 0 ? tool_calls : undefined,
+    };
+  }
+
+  abstract getAvailableModels(): Promise<ModelInfo[]>;
 }

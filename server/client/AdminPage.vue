@@ -3,12 +3,17 @@
     <RouterLink to="/" class="back">← All apps</RouterLink>
     <h1>Admin</h1>
 
-    <section class="log-section">
+    <section class="section">
+      <h2>Secrets</h2>
+      <SecretManager />
+    </section>
+
+    <section class="section">
       <h2>Treetop server</h2>
       <LogPanel log-url="/api/system/logs/treetop" />
     </section>
 
-    <section class="log-section">
+    <section class="section">
       <h2>Traefik</h2>
       <LogPanel log-url="/api/system/logs/traefik" />
     </section>
@@ -17,6 +22,7 @@
 
 <script setup lang="ts">
 import LogPanel from './LogPanel.vue';
+import SecretManager from './SecretManager.vue';
 </script>
 
 <style scoped>
@@ -42,7 +48,7 @@ h1 {
   margin: 24px 0 32px;
 }
 
-.log-section {
+.section {
   margin-bottom: 40px;
 }
 

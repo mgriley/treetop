@@ -57,6 +57,35 @@ export async function deleteApp(id: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to delete app');
 }
 
+export async function listExpectedSecrets(): Promise<string[]> {
+  const res = await fetch('/api/secrets/expected');
+  if (!res.ok) throw new Error('Failed to fetch expected secrets');
+  return res.json();
+}
+
+export async function listSecrets(): Promise<string[]> {
+  const res = await fetch('/api/secrets');
+  if (!res.ok) throw new Error('Failed to fetch secrets');
+  return res.json();
+}
+
+export async function setSecret(key: string, value: string): Promise<void> {
+  const res = await fetch(`/api/secrets/${key}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? 'Failed to set secret');
+  }
+}
+
+export async function deleteSecret(key: string): Promise<void> {
+  const res = await fetch(`/api/secrets/${key}`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('Failed to delete secret');
+}
+
 export async function installApp(url: string, name: string): Promise<App> {
   const res = await fetch('/api/apps/install', {
     method: 'POST',

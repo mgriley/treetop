@@ -2,8 +2,12 @@ import { Router, Request, Response } from 'express';
 import { randomUUID } from 'crypto';
 import { mkdirSync } from 'fs';
 import { z } from 'zod';
+import { createAnthropic } from '@ai-sdk/anthropic';
 import { docker } from '../docker';
 import { streamContainerLogs } from '../lib/streamLogs';
+import { SecretsStore } from '../lib/SecretsStore';
+import { VercelAgentInterface } from '../agent/VercelAgentInterface';
+import { ContainerAgent } from '../agent/ContainerAgent';
 
 const router = Router();
 
@@ -207,15 +211,45 @@ router.get('/:id/logs', async (req: Request, res: Response) => {
   await streamContainerLogs(container, req, res);
 });
 
-// Send a prompt to the AI agent for a given app (no-op stub)
+// Stream an AI agent conversation for a given app over SSE
 router.post('/:id/agent', async (req: Request, res: Response) => {
   const { id } = AppId.parse(req.params);
-  const { prompt } = z.object({ prompt: z.string().min(1) }).parse(req.body);
+  const { prompt, model } = z.object({
+    prompt: z.string().min(1),
+    model: z.string().default('claude-sonnet-4-6'),
+  }).parse(req.body);
 
   const container = await findContainer(id);
   if (!container) { res.status(404).json({ error: 'App not found' }); return; }
 
-  res.json({ id, prompt, result: null });
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  const send = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`);
+
+  try {
+    const apiKey = SecretsStore.get('ANTHROPIC_API_KEY');
+    if (!apiKey) {
+      send({ type: 'error', message: 'ANTHROPIC_API_KEY is not set. Add it in Admin → Secrets.' });
+      return;
+    }
+    const agentInterface = new VercelAgentInterface(createAnthropic({ apiKey }));
+    const containerAgent = new ContainerAgent(agentInterface, container);
+    const messages = [{ role: 'user' as const, content: prompt }];
+
+    for await (const chunk of containerAgent.streamReply(messages, model)) {
+      send(chunk);
+    }
+
+    send({ type: 'done' });
+  } catch (err) {
+    send({ type: 'error', message: err instanceof Error ? err.message : 'Agent error' });
+  } finally {
+    res.end();
+  }
 });
 
 // Delete an app and its container

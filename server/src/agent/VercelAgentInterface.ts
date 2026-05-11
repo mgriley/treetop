@@ -1,11 +1,17 @@
-import { generateText, tool, jsonSchema, type LanguageModel } from 'ai';
-import type { AgentInterface, AgentMessage, AgentTool, AgentReply, AgentToolCall } from './AgentInterface';
+import { streamText, tool, jsonSchema, type LanguageModel } from 'ai';
+import { AgentInterface, type AgentMessage, type AgentTool, type AgentReplyChunk, type AgentToolCall, type ModelInfo } from './AgentInterface';
 
-export class VercelAgentInterface implements AgentInterface {
-  constructor(private modelFactory: (model: string) => LanguageModel) {}
+export class VercelAgentInterface extends AgentInterface {
+  constructor(private modelFactory: (model: string) => LanguageModel) {
+    super();
+  }
 
-  async getReply(messages: AgentMessage[], tools: AgentTool[], model: string): Promise<AgentReply> {
-    const result = await generateText({
+  async *streamReply(
+    messages: AgentMessage[],
+    tools: AgentTool[],
+    model: string,
+  ): AsyncIterable<AgentReplyChunk> {
+    const result = streamText({
       model: this.modelFactory(model),
       messages: messages.map(toVercelMessage),
       tools: Object.fromEntries(
@@ -19,16 +25,26 @@ export class VercelAgentInterface implements AgentInterface {
       ),
     });
 
-    const toolCalls: AgentToolCall[] = result.toolCalls.map((tc) => ({
-      id: tc.toolCallId,
-      type: 'function',
-      function: { name: tc.toolName, arguments: tc.input as Record<string, unknown> },
-    }));
+    for await (const part of result.fullStream) {
+      if (part.type === 'text-delta') {
+        yield { type: 'text-delta', delta: part.text };
+      } else if (part.type === 'tool-call') {
+        const toolCall: AgentToolCall = {
+          id: part.toolCallId,
+          type: 'function',
+          function: { name: part.toolName, arguments: part.input as Record<string, unknown> },
+        };
+        yield { type: 'tool_call', tool_call: toolCall };
+      }
+    }
+  }
 
-    return {
-      content: result.text || null,
-      tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
-    };
+  async getAvailableModels(): Promise<ModelInfo[]> {
+    return [
+      { name: 'claude-opus-4-7' },
+      { name: 'claude-sonnet-4-6' },
+      { name: 'claude-haiku-4-5-20251001' },
+    ];
   }
 }
 
